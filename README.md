@@ -1,4 +1,4 @@
 # tabulator-table
 
-![alt text] (tabulator-table/Screen Shot 2018-10-26 at 2.41.50 PM.png)
+![alt text] (https://github.com/groodlooker/tabulator-table/blob/master/Screen%20Shot%202018-10-26%20at%202.41.50%20PM.png)
       
