@@ -89,16 +89,12 @@ function standardTable(data, config) {
                 var properties = Object.keys(cellValues[key]);
                 columnLabel = key;
                 columnLabel = columnLabel.slice(columnLabel.indexOf(".")+1);
-                // if (columnLabel == coloringColumn) {}
-                // console.log(columnLabel);
                 if (properties.includes('rendered')) {
                     rowDetails[columnLabel] = cellValues[key]['rendered'];
                     rowDetails['sorting_value_'+columnLabel] = cellValues[key]['value'];
                     if (config.comparison_type == 'numeric') {
                         if (columnLabel == coloringColumn) {
                             var result = eval(cellValues[key]['value'] + config.comparison_value);
-                            // console.log(result);
-                            // console.log(config.comparison_value);
                             rowDetails['numericThresh'] = result;
                         }
                     }
@@ -107,15 +103,12 @@ function standardTable(data, config) {
                     if (config.comparison_type == 'numeric') {
                         if (columnLabel == coloringColumn) {
                             var result = eval(cellValues[key]['value'] + config.comparison_value);
-                            // console.log(result);
-                            // console.log(config.comparison_value);
                             rowDetails['numericThresh'] = result;
                         }
                     }                    
                 }
                 rowDetails['links_' + columnLabel] = cellValues[key]['links'];
                 s +=1;
-                // delete rowDetails.order_info;
             }
             z+=1;
 
@@ -130,7 +123,8 @@ function colWidthFunction(element) {
     console.log(element);
 }
 
-function dimensionGetter(queryResponse) {
+function dimensionGetter(queryResponse, config) {
+    console.log(config);
     var pivotTableColumns = [];
     for (var g = 0; g < queryResponse.fields.dimension_like.length; g++) {
         var pivotDimensions = {};
@@ -141,6 +135,10 @@ function dimensionGetter(queryResponse) {
         var tempField = queryResponse.fields.dimension_like[g].name; //get normal label for table calcs
         var fieldName = tempField.slice(tempField.indexOf(".")+1);
         pivotDimensions['field'] = fieldName;
+        if (pivotDimensions['title'] == config.color_row) {
+            console.log('captain ryder sir');
+            coloringColumn = fieldName;
+        }
         // pivotDimensions['titleFormatter'] = customFormatter;
         pivotTableColumns.push(pivotDimensions);
     }
@@ -148,8 +146,8 @@ function dimensionGetter(queryResponse) {
 }
 
 
-function pivotColumns(data, queryResponse) {
-    var pivotTableColumns = dimensionGetter(queryResponse);
+function pivotColumns(data, queryResponse,config) {
+    var pivotTableColumns = dimensionGetter(queryResponse,config);
 
     for (var i = 0; i < queryResponse.fields.measure_like.length; i++) {
 
@@ -165,7 +163,7 @@ function pivotColumns(data, queryResponse) {
             var labeler;
             labeler = queryResponse.pivots[u]['key'];
             if (labeler === "$$$_row_total_$$$") {
-                labeler = "Row Total";
+                labeler = "Total";
             }
             if (labeler.indexOf("|") < 0 ) {
                 var indy = labeler.length;
@@ -174,7 +172,12 @@ function pivotColumns(data, queryResponse) {
             }
             pivotTableSubColumns['title'] = labeler.slice(0,indy);
             var fieldNameShort = queryResponse.fields.measure_like[i].name;
-            pivotTableSubColumns['field'] = fieldNameShort.slice(fieldNameShort.indexOf(".")+1) + "_" + labeler;
+            if (queryResponse.pivots[u]['key'] === "$$$_row_total_$$$") {
+                pivotTableSubColumns['field'] = fieldNameShort.slice(fieldNameShort.indexOf(".")+1) + "_" + queryResponse.pivots[u]['key'];
+            } else {
+                pivotTableSubColumns['field'] = fieldNameShort.slice(fieldNameShort.indexOf(".")+1) + "_" + labeler;
+            }
+            
             pivotTableSubColumns['sorter'] = sorterizer;
             // pivotTableSubColumns['titleFormatter'] = headerFormatter;
             pivotMeasures['columns'].push(pivotTableSubColumns);
@@ -228,13 +231,13 @@ function getPivotData(data,queryResponse,config){
 
 function lineFormatter(cell, formatterParams, onRendered) {
     onRendered(function(){
-        $(cell.getElement()).sparkline(cell.getValue(), {width:"100%", type:"line"});
+        $(cell.getElement()).sparkline(cell.getValue(), {width:"100%", type:"line", lineColor: table_spark_theme});
     });
 }
 
 function barFormatter(cell, formatterParams, onRendered){
     onRendered(function(){ 
-        $(cell.getElement()).sparkline(cell.getValue(), {width:"100%", type:"bar", barWidth:14, barColor: 'teal'});
+        $(cell.getElement()).sparkline(cell.getValue(), {width:"100%", type:"bar", barWidth:14, barColor: table_spark_theme});
     });
 }
 
@@ -255,8 +258,8 @@ var customFormatter = function(cell, formatterParams, onRendered){
 
 function sparkPivot(data, queryResponse, config) {
 
-    console.log(queryResponse);
-    var pivotSparkColumns = dimensionGetter(queryResponse);
+    console.log(config);
+    var pivotSparkColumns = dimensionGetter(queryResponse, config);
 
     for (var p = 0; p < queryResponse.fields.measure_like.length; p++){
         var pivotMeasures = {};
@@ -345,7 +348,7 @@ function normalColumns(data, queryResponse, config){
             }
             dimensionProperties['headerFilter'] = 'input';
             dimensionProperties['sorter'] = 'string';
-            dimensionProperties['titleFormatter'] = headerFormatter;
+            // dimensionProperties['titleFormatter'] = headerFormatter;
             fieldsForTable.push(dimensionProperties);
 
         }
@@ -364,13 +367,14 @@ function normalColumns(data, queryResponse, config){
             coloringColumn = measureName;
             }
             measureProperties['sorter'] = sorterizer;
-            measureProperties['titleFormatter'] = headerFormatter;
+            // measureProperties['titleFormatter'] = headerFormatter;
             fieldsForTable.push(measureProperties);
         }
         return fieldsForTable;
 }
 
 
+var table_spark_theme;
         
 
 looker.plugins.visualizations.add({
@@ -529,11 +533,13 @@ looker.plugins.visualizations.add({
         }
     }, 
     updateAsync: function(data, element, config, queryResponse, details, doneRendering){
+        coloringColumn = undefined;
         var measureCount = queryResponse.fields.measure_like.length;
         var dimensionCount = queryResponse.fields.dimension_like.length;
         var pivotCount = queryResponse.fields.pivots.length;
 
         headerSize = config.header_font_size;
+        table_spark_theme = config.table_theme;
 
 
         // var coloringColumn; //store field name based on label to color a row by, check queryResponse first, then data for hidden fields
@@ -547,7 +553,7 @@ looker.plugins.visualizations.add({
             if (config.spark_table == "yes") {
                 fieldsForTable = sparkPivot(data,queryResponse,config);
             } else {
-                fieldsForTable = pivotColumns(data, queryResponse);
+                fieldsForTable = pivotColumns(data, queryResponse,config);
             }
         } else {
             fieldsForTable = normalColumns(data, queryResponse, config);
@@ -596,17 +602,18 @@ looker.plugins.visualizations.add({
         
         if (typeof coloringColumn === "undefined") {
             coloringColumn = config.color_row.toLowerCase();
-            coloringColumn = coloringColumn.replace(" ","_");
+            console.log(coloringColumn.replace(/\s/g,"_"));
+            coloringColumn = coloringColumn.replace(/\s/g,"_");
         }
 
-        // console.log(coloringColumn);
+        console.log(coloringColumn);
         
 
-        if (pivotCount == 0) {
-            standardTable(data, config);
-        } else if (pivotCount == 1) {
-            getPivotData(data, config);
-        }
+        // if (pivotCount == 0) {
+        //     standardTable(data, config);
+        // } else if (pivotCount == 1) {
+        //     getPivotData(data, config);
+        // }
 
 
         if (pivotCount == 1) {
@@ -618,6 +625,8 @@ looker.plugins.visualizations.add({
         } else {
             tableData = standardTable(data,config);
         }
+
+        console.log(tableData)
 
         buildTable(tableData,config.body_font_size);
 
