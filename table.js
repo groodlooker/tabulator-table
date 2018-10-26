@@ -74,6 +74,15 @@ function headerSizer(fontSize) {
     tabletime.redraw(true);
 }
 
+function numericThreshGetter(value, thresh) {
+    try {
+        var result = eval(value + thresh);
+        return result;
+    } catch(err) {
+        return false;
+    }        
+}
+
 function standardTable(data, config) {
             z = 1;
             standardTableData = [];
@@ -94,16 +103,14 @@ function standardTable(data, config) {
                     rowDetails['sorting_value_'+columnLabel] = cellValues[key]['value'];
                     if (config.comparison_type == 'numeric') {
                         if (columnLabel == coloringColumn) {
-                            var result = eval(cellValues[key]['value'] + config.comparison_value);
-                            rowDetails['numericThresh'] = result;
+                            rowDetails['numericThresh'] = numericThreshGetter(cellValues[key]['value'],config.comparison_value);
                         }
                     }
                 } else {
                     rowDetails[columnLabel] = cellValues[key]['value'];
                     if (config.comparison_type == 'numeric') {
                         if (columnLabel == coloringColumn) {
-                            var result = eval(cellValues[key]['value'] + config.comparison_value);
-                            rowDetails['numericThresh'] = result;
+                            rowDetails['numericThresh'] = numericThreshGetter(cellValues[key]['value'],config.comparison_value);
                         }
                     }                    
                 }
@@ -175,7 +182,7 @@ function pivotColumns(data, queryResponse,config) {
             if (queryResponse.pivots[u]['key'] === "$$$_row_total_$$$") {
                 pivotTableSubColumns['field'] = fieldNameShort.slice(fieldNameShort.indexOf(".")+1) + "_" + queryResponse.pivots[u]['key'];
             } else {
-                pivotTableSubColumns['field'] = fieldNameShort.slice(fieldNameShort.indexOf(".")+1) + "_" + labeler;
+                pivotTableSubColumns['field'] = fieldNameShort.slice(fieldNameShort.indexOf(".")+1) + "_" + labeler.toLowerCase();
             }
             
             pivotTableSubColumns['sorter'] = sorterizer;
@@ -209,6 +216,7 @@ function getPivotData(data,queryResponse,config){
                     //     pivot = 'Row Total';
                     // }
                     var pivotlabel = fieldref + "_" + pivot;
+                    pivotlabel = pivotlabel.toLowerCase();
                     var subProperties = Object.keys(arr[pivot]);
                     if (subProperties.includes('rendered')) {
                         pivotCell[pivotlabel] = arr[pivot]['rendered'];
@@ -237,7 +245,7 @@ function lineFormatter(cell, formatterParams, onRendered) {
 
 function barFormatter(cell, formatterParams, onRendered){
     onRendered(function(){ 
-        $(cell.getElement()).sparkline(cell.getValue(), {width:"100%", type:"bar", barWidth:14, barColor: table_spark_theme});
+        $(cell.getElement()).sparkline(cell.getValue(), {width:"100%", type:"bar", barWidth:16, barColor: table_spark_theme});
     });
 }
 
@@ -258,7 +266,9 @@ var customFormatter = function(cell, formatterParams, onRendered){
 
 function sparkPivot(data, queryResponse, config) {
 
-    console.log(config);
+    console.log("Row total sitch: " + queryResponse.has_row_totals);
+
+    console.log(queryResponse);
     var pivotSparkColumns = dimensionGetter(queryResponse, config);
 
     for (var p = 0; p < queryResponse.fields.measure_like.length; p++){
@@ -283,11 +293,14 @@ function sparkPivot(data, queryResponse, config) {
             console.log(sp);
             pivotSubColumns['formatter'] = eval(sp);
             pivotMeasures['columns'].push(pivotSubColumns);
-            var pivTotal = {};
-            pivTotal['title'] = "Total";
-            pivTotal['field'] = measNameShort + "_row_total";
-            pivTotal['sorter'] = sorterizer;
-            pivotMeasures['columns'].push(pivTotal);
+            if (queryResponse.has_row_totals == true) {
+                var pivTotal = {};
+                pivTotal['title'] = "Total";
+                pivTotal['field'] = measNameShort + "_row_total";
+                pivTotal['sorter'] = sorterizer;
+                pivotMeasures['columns'].push(pivTotal);
+            }
+            
 
         }
         pivotSparkColumns.push(pivotMeasures);
@@ -569,18 +582,25 @@ looker.plugins.visualizations.add({
             if (config.comparison_type == 'exact') {
                 if(rowData[coloringColumn] == config.comparison_value){
                     currentStyle = currentStyle + " " + config.comparison_result;
-                    row.getElement().setAttribute("class",currentStyle);
+                    // row.getElement().setAttribute("class",currentStyle);
                     }
             } else {
-                if(rowData['numericThresh'] == true) {
-                    currentStyle = currentStyle + " " + config.comparison_result;
-                    row.getElement().setAttribute("class",currentStyle);
-                }
+                if(config.comparison_type == 'numeric') {
+                    console.log(coloringColumn);
+                    console.log(rowData["sorting_value_" + coloringColumn]);
+                    console.log(config.comparison_value);
+                    var colorTF = numericThreshGetter(rowData["sorting_value_" + coloringColumn],config.comparison_value);
+                    console.log(colorTF);
+                    if (colorTF == true) {
+                        currentStyle = currentStyle + " " + config.comparison_result;
+                    }
+                } 
             }
-
+            row.getElement().setAttribute("class",currentStyle);
             },
             height:config.table_height, // set height of table (in CSS or here), this enables the Virtual DOM and improves render speed dramatically (can be any valid css height value)
             layout:config.table_layout,
+            scrollToRowIfVisible: false,
             columnVertAlign: "bottom",
             columns: fieldsForTable,
             cellClick: function(e, cell){
