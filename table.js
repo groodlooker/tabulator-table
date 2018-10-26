@@ -245,7 +245,7 @@ function lineFormatter(cell, formatterParams, onRendered) {
 
 function barFormatter(cell, formatterParams, onRendered){
     onRendered(function(){ 
-        $(cell.getElement()).sparkline(cell.getValue(), {width:"100%", type:"bar", barWidth:16, barColor: table_spark_theme});
+        $(cell.getElement()).sparkline(cell.getValue(), {width:"100%", type:"bar", barWidth:12, barColor: table_spark_theme});
     });
 }
 
@@ -621,9 +621,12 @@ looker.plugins.visualizations.add({
         
         
         if (typeof coloringColumn === "undefined") {
-            coloringColumn = config.color_row.toLowerCase();
-            console.log(coloringColumn.replace(/\s/g,"_"));
-            coloringColumn = coloringColumn.replace(/\s/g,"_");
+            if (typeof config.color_row != "undefined") {
+                coloringColumn = config.color_row.toLowerCase();
+                console.log(coloringColumn.replace(/\s/g,"_"));
+                coloringColumn = coloringColumn.replace(/\s/g,"_");
+            }
+
         }
 
         console.log(coloringColumn);
